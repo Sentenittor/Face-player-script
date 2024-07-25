@@ -1,0 +1,199 @@
+local player = game.Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local mouse = player:GetMouse()
+local runService = game:GetService("RunService")
+local tweenService = game:GetService("TweenService")
+
+-- Function to create the GUI
+local function createGui()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "FaceControlGui"
+    screenGui.Parent = playerGui
+
+    -- Face Button
+    local faceButton = Instance.new("TextButton")
+    faceButton.Size = UDim2.new(0, 100, 0, 100)  -- Smaller circular button
+    faceButton.Position = UDim2.new(0.1, 0, 0.1, 0)
+    faceButton.Text = "Enable Face"
+    faceButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    faceButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    faceButton.Font = Enum.Font.GothamBold
+    faceButton.TextScaled = true
+    faceButton.TextStrokeTransparency = 0.8
+    faceButton.Parent = screenGui
+
+    -- Make the button circular
+    local uiCorner = Instance.new("UICorner")
+    uiCorner.CornerRadius = UDim.new(0, 50)  -- Radius to make it circular
+    uiCorner.Parent = faceButton
+
+    -- Add UI elements for better appearance
+    local uiStroke = Instance.new("UIStroke")
+    uiStroke.Color = Color3.fromRGB(0, 0, 0) -- Black border
+    uiStroke.Thickness = 3
+    uiStroke.Parent = faceButton
+
+    local uiTextSizeConstraint = Instance.new("UITextSizeConstraint")
+    uiTextSizeConstraint.MaxTextSize = 16
+    uiTextSizeConstraint.Parent = faceButton
+
+    -- Add UI gradient to the button
+    local uiGradient = Instance.new("UIGradient")
+    uiGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(70, 70, 70)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(45, 45, 45))
+    }
+    uiGradient.Rotation = 90
+    uiGradient.Parent = faceButton
+
+    -- Add shadow effect to the button
+    local uiShadow = Instance.new("ImageLabel")
+    uiShadow.BackgroundTransparency = 1
+    uiShadow.Image = "rbxassetid://5587865196"
+    uiShadow.Size = UDim2.new(1, 10, 1, 10)
+    uiShadow.Position = UDim2.new(0, -5, 0, -5)
+    uiShadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    uiShadow.ImageTransparency = 0.5
+    uiShadow.Parent = faceButton
+
+    -- Add padding to the button text
+    local uiPadding = Instance.new("UIPadding")
+    uiPadding.PaddingTop = UDim.new(0, 5)
+    uiPadding.PaddingBottom = UDim.new(0, 5)
+    uiPadding.Parent = faceButton
+
+    -- Notification GUI function
+    local function createNotification(message, duration)
+        local notification = Instance.new("TextLabel")
+        notification.Size = UDim2.new(0, 200, 0, 50)
+        notification.Position = UDim2.new(-0.2, 0, 0.5, -25)  -- Start off-screen
+        notification.Text = message
+        notification.TextColor3 = Color3.fromRGB(255, 255, 255)
+        notification.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        notification.BackgroundTransparency = 0.5
+        notification.Font = Enum.Font.GothamBold
+        notification.TextScaled = true
+        notification.TextStrokeTransparency = 0.8
+        notification.Parent = screenGui
+
+        local uiCorner = Instance.new("UICorner")
+        uiCorner.CornerRadius = UDim.new(0, 10)
+        uiCorner.Parent = notification
+
+        local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        local tweenGoal = {Position = UDim2.new(0.1, 0, 0.5, -25)}
+        local tween = tweenService:Create(notification, tweenInfo, tweenGoal)
+
+        tween:Play()
+        tween.Completed:Connect(function()
+            -- Fade out after the tween completes
+            local fadeOutTween = tweenService:Create(notification, TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.In), {BackgroundTransparency = 1, TextTransparency = 1})
+            fadeOutTween:Play()
+            fadeOutTween.Completed:Connect(function()
+                notification:Destroy()
+            end)
+        end)
+    end
+
+    return screenGui, faceButton, createNotification
+end
+
+local screenGui, faceButton, createNotification = createGui()
+
+local facingEnabled = false
+local targetPlayer = nil
+local canFace = true
+local soundId = "rbxassetid://YOUR_AUDIO_ASSET_ID"  -- Replace with your audio asset ID
+
+-- Function to play sound
+local function playSound(id)
+    local sound = Instance.new("Sound")
+    sound.SoundId = id
+    sound.Parent = player.Character or player
+    sound:Play()
+    game:GetService("Debris"):AddItem(sound, 5)  -- Remove sound after 5 seconds
+end
+
+-- Function to handle button click
+local function onButtonClick()
+    facingEnabled = not facingEnabled
+    faceButton.Text = facingEnabled and "Disable Face" or "Enable Face"
+    if not facingEnabled then
+        if targetPlayer then
+            -- Play sound for unfacing
+            playSound(soundId)
+            createNotification("Stopped Facing", 2)
+            targetPlayer = nil
+            canFace = true
+        end
+    elseif targetPlayer and canFace then
+        createNotification("Facing " .. targetPlayer.Name, 2)
+        canFace = false
+    end
+end
+
+-- Function to handle mouse click
+local function onMouseClick()
+    if facingEnabled and canFace then
+        local target = mouse.Target
+        if target and target.Parent and target.Parent:FindFirstChild("Humanoid") then
+            targetPlayer = game.Players:GetPlayerFromCharacter(target.Parent)
+            if targetPlayer then
+                -- Display text and play sound
+                playSound(soundId)
+                createNotification("Facing " .. targetPlayer.Name, 2)
+                canFace = false
+            end
+        end
+    end
+end
+
+-- Function to continuously face the target while preserving the vertical alignment
+local function keepFacingTarget()
+    if facingEnabled and targetPlayer then
+        local character = player.Character or player.CharacterAdded:Wait()
+        local characterHumanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+        local targetHumanoidRootPart = targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+        if characterHumanoidRootPart and targetHumanoidRootPart then
+            local characterPosition = characterHumanoidRootPart.Position
+            local targetPosition = targetHumanoidRootPart.Position
+
+            -- Calculate direction to the target, keeping only the X and Z components
+            local direction = Vector3.new(targetPosition.x - characterPosition.x, 0, targetPosition.z - characterPosition.z).unit
+
+            -- Create a new CFrame that faces the target direction while preserving the character's vertical alignment
+            local newCFrame = CFrame.lookAt(characterPosition, characterPosition + direction, Vector3.new(0, 1, 0))
+
+            -- Apply the new CFrame to the HumanoidRootPart
+            characterHumanoidRootPart.CFrame = newCFrame
+        end
+    end
+end
+
+-- Connect the GUI button click to the handler
+faceButton.MouseButton1Click:Connect(onButtonClick)
+
+-- Handle mouse click
+mouse.Button1Down:Connect(onMouseClick)
+
+-- Continuously update character orientation
+runService.RenderStepped:Connect(keepFacingTarget)
+
+-- Recreate the GUI on respawn
+local function onCharacterAdded()
+    screenGui:Destroy()
+    screenGui, faceButton, createNotification = createGui()
+    faceButton.MouseButton1Click:Connect(onButtonClick)
+    mouse.Button1Down:Connect(onMouseClick)
+end
+
+player.CharacterAdded:Connect(onCharacterAdded)
+
+-- Initial character setup
+if player.Character then
+    onCharacterAdded()
+end
+
+-- Inform the executor that the script has loaded
+print("FaceControl script loaded")
